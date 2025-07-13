@@ -4,6 +4,6 @@ tweepy>=4.15                      # X/Twitter
 python-linkedin-v2>=0.1.8         # LinkedIn
 requests>=2.32
 moviepy>=1.0.3
-openai>=1.30                      # if you use GPT for script
+openai>=1.30                      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
 tenacity>=8.3                     # retries
 apscheduler>=3.10                 # scheduling

@@ -25,7 +25,7 @@ class Story:
 def fetch_top_stories(api_key: str, *, country: str="us", limit: int = 5 ) -> List[Story]:
     url = "https://newsapi.org/v2/top-headlines"
     params = {
-        "counntry" : country,
+        "country" : country,
         "pageSize": limit,
         "apiKey": api_key,
     }
