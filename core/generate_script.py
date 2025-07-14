@@ -1,38 +1,51 @@
 import os
 import requests
 
-API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN") or "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"
-API_URL = "https://api-inference.huggingface.co/models/gpt2"
+from transformers import pipeline, set_seed
 
-headers = {"Authorization": f"Bearer {API_TOKEN}"}
-
-def query_huggingface(payload):
-    response = requests.post(API_URL, headers=headers, json=payload)
-    if response.status_code !=200:
-        raise Exception(f"API Error: {response.status_code} - {response.text}")
-    return response.json()
+# Load the local GPT-2 text generation pipeline
+pipe = pipeline("text-generation", model="openai-community/gpt2")
+set_seed(42)  # Optional: makes output consistent
 
 def generate_video_script(articles):
-    prompt = "You are a news anchor. Summarize these news stories in a natural, engaging style fit for a 1-minute video narration:\n\n"
+    """
+    Generate a video narration script from news articles using GPT-2 locally.
+
+    Args:
+        articles (list of dict): Each with 'title' and optionally 'description'.
+
+    Returns:
+        str: Generated video narration script.
+    """
+    prompt = "Write a short, natural-sounding 1-minute news script summarizing the following headlines:\n\n"
+    
     for i, article in enumerate(articles, 1):
-        prompt += f"{i}. Title: {article.get('title', '')}\n"
-        if article.get('description'):
-            prompt += f"Description{article['description']}\n"
-        prompt += "\n"
-    prompt += "Narration Script:"
+        prompt += f"{i}. Title: {article['title']}\n"
+        if article.get("description"):
+            prompt += f"   Description: {article['description']}\n"
+    prompt += "\nNarration Script:\n"
 
-    payload = {
-            "inputs": prompt,
-        "parameters": {
-            "max_length": 150,
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "return_full_text": False,
-            "num_return_sequences": 1,
+    result = pipe(prompt, max_length=200, num_return_sequences=1)[0]["generated_text"]
+
+    # Strip everything before the actual narration if needed
+    return result.split("Narration Script:")[-1].strip()
+
+if __name__ == "__main__":
+    sample_articles = [
+        {
+            "title": "Markets rally as inflation slows",
+            "description": "Markets are seeing gains as inflation numbers come in lower than expected."
+        },
+        {
+            "title": "AI breakthroughs announced",
+            "description": "New large language models are pushing the limits of artificial intelligence."
+        },
+        {
+            "title": "World leaders reach climate deal",
+            "description": "Historic agreement made at the summit to cut global emissions by 40%."
         }
-    }
+    ]
 
-    output = query_huggingface(payload)
-
-    if isinstance(output, list) and len(output) > 0 and "generated_text" in output[0]:
-        return output[0]["generated"]
+    script = generate_video_script(sample_articles)
+    print("Generated Video Script:\n")
+    print(script)

@@ -1,61 +1,43 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 import requests
-from dataclasses import dataclass
-from typing import List, Optional
+from core.settings import NEWS_API_KEY, ARTICLE_COUNT
 
+BASE_URL = "https://newsapi.org/v2/top-headlines"
 
-#
-# Data Model
-#
+# Global sources (you can add more if needed)
+GLOBAL_SOURCES = "bbc-news,cnn,al-jazeera-english,reuters,associated-press"
 
-@dataclass
-class Story:
-    headline: str
-    url: str
-    image_url: Optional[str] = None
-
-
-#
-# News Fetching
-#
-
-def fetch_top_stories(api_key: str, *, country: str="us", limit: int = 5 ) -> List[Story]:
-    url = "https://newsapi.org/v2/top-headlines"
+def fetch_top_headlines():
     params = {
-        "country" : country,
-        "pageSize": limit,
-        "apiKey": api_key,
+        "sources": GLOBAL_SOURCES,
+        "pageSize": ARTICLE_COUNT,
+        "apiKey": NEWS_API_KEY
     }
-    response = requests.get(url, params=params, timeout=10)
-    response.raise_for_status()
 
-    articles = response.json().get("articles", [])
-    stories = []
+    try:
+        response = requests.get(BASE_URL, params=params)
+        response.raise_for_status()
+        data = response.json()
+        articles = data.get("articles", [])
+        
+        if not articles:
+            print("⚠️ No articles found.")
+            return []
 
-    for article in articles:
-        if not article.get("title") or not article.get("url"):
-            continue
-        stories.append(
-            Story(
-                headline=article["title"].strip(),
-                url=article["url"],
-                image_url=article.get("urlToImage")
-            )
-        )
-    return stories
+        # Simplify article structure
+        simplified = [
+            {
+                "title": article["title"],
+                "description": article["description"],
+                "url": article["url"],
+                "content": article.get("content", ""),
+                "source": article["source"]["name"]
+            }
+            for article in articles
+        ]
 
-#
-# Run Demo
-#
+        return simplified
 
-if __name__ == "__main__":
-    API_KEY = os.getenv("NEWSAPI_KEY")
-    if not API_KEY:
-        raise EnvironmentError("Please set the NEWSAPI_KEY environment variable")
-    
-    stories = fetch_top_stories(API_KEY, country="us", limit=3)
-    for i, s in enumerate(stories, 1):
-        print(f"{i}. {s.headline}\n{s.url}\n")
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error fetching news: {e}")
+        return []
