@@ -7,7 +7,7 @@ from transformers import pipeline, set_seed
 pipe = pipeline("text-generation", model="openai-community/gpt2")
 set_seed(42)  # Optional: makes output consistent
 
-def generate_video_script(articles):
+def generate_script(articles):
     """
     Generate a video narration script from news articles using GPT-2 locally.
 
@@ -46,6 +46,6 @@ if __name__ == "__main__":
         }
     ]
 
-    script = generate_video_script(sample_articles)
+    script = generate_script(sample_articles)
     print("Generated Video Script:\n")
     print(script)
