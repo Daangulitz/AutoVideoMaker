@@ -1,51 +1,39 @@
-import os
-import requests
+# core/generate_script.py
 
-from transformers import pipeline, set_seed
+from transformers import pipeline
 
-# Load the local GPT-2 text generation pipeline
-pipe = pipeline("text-generation", model="openai-community/gpt2")
-set_seed(42)  # Optional: makes output consistent
+# Initialize once globally to save loading time
+pipe = pipeline("text-generation", model="openai-community/gpt2", max_length=150)
 
-def generate_script(articles):
+def generate_script(article):
     """
-    Generate a video narration script from news articles using GPT-2 locally.
-
-    Args:
-        articles (list of dict): Each with 'title' and optionally 'description'.
-
-    Returns:
-        str: Generated video narration script.
-    """
-    prompt = "Write a short, natural-sounding 1-minute news script summarizing the following headlines:\n\n"
+    Generate a short script/narration text based on a single news article dict.
+    Uses title and description/content to form a prompt for the text generation model.
     
-    for i, article in enumerate(articles, 1):
-        prompt += f"{i}. Title: {article['title']}\n"
-        if article.get("description"):
-            prompt += f"   Description: {article['description']}\n"
-    prompt += "\nNarration Script:\n"
+    Args:
+        article (dict): News article with keys like 'title' and 'description'.
+        
+    Returns:
+        str: Generated script text.
+    """
+    title = article.get("title", "No title")
+    description = article.get("description") or article.get("content") or ""
 
-    result = pipe(prompt, max_length=200, num_return_sequences=1)[0]["generated_text"]
-
-    # Strip everything before the actual narration if needed
-    return result.split("Narration Script:")[-1].strip()
-
-if __name__ == "__main__":
-    sample_articles = [
-        {
-            "title": "Markets rally as inflation slows",
-            "description": "Markets are seeing gains as inflation numbers come in lower than expected."
-        },
-        {
-            "title": "AI breakthroughs announced",
-            "description": "New large language models are pushing the limits of artificial intelligence."
-        },
-        {
-            "title": "World leaders reach climate deal",
-            "description": "Historic agreement made at the summit to cut global emissions by 40%."
-        }
-    ]
-
-    script = generate_script(sample_articles)
-    print("Generated Video Script:\n")
-    print(script)
+    prompt = (
+        f"Write a short, engaging video script based on this news headline and description:\n\n"
+        f"Title: {title}\n"
+        f"Description: {description}\n\n"
+        f"Script:"
+    )
+    
+    # Run the text generation model on the prompt
+    result = pipe(prompt, max_length=150, num_return_sequences=1)
+    
+    # Extract generated text from result
+    generated_text = result[0]['generated_text']
+    
+    # Remove prompt from the output (keep only generated part after prompt)
+    script = generated_text[len(prompt):].strip()
+    
+    # Optional: Limit script length or do cleanup here
+    return script
