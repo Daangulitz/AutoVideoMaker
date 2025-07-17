@@ -1,45 +1,34 @@
-# main.py
-
-import os
-from core.generate_script import generate_script
 from core.fetch_news import fetch_news
+from core.generate_script import generate_script
 from core.image_fetcher import fetch_image_urls
 from core.make_video import make_video
 
-# Config constants (adjust if needed)
-OUTPUT_DIR = "outputs"
-NEWS_API_PAGE_SIZE = 3
-GOOGLE_API_KEY = 'AIzaSyChJ3ygRo98LslFDxm7OopoBqqlPfx9y_g'
-GOOGLE_CX = 'f54d4c38836df40ac'
-NUM_IMAGES_PER_ARTICLE = 5
+# Your API config here
+API_KEY = 'YOUR_API_KEY'
+CX = 'YOUR_CX_CODE'
 
 def main():
-    articles = fetch_news(page_size=NEWS_API_PAGE_SIZE)
-    if not articles:
-        print("❌ No articles fetched. Exiting.")
-        return
+    articles = fetch_news(page_size=3)
 
-    for idx, article in enumerate(articles, 1):
-        title = article.get("title", "No Title")
-        print(f"\n[{idx}] Processing article: {title}")
-
+    for article in articles:
         try:
-            # Generate narration script from article content
+            print(f"[+] Processing article: {article['title']}")
+            
+            # Generate narration script/text for video
             script_text = generate_script(article)
-            print(f"✍️ Script generated (preview): {script_text[:80]}...")
-
-            # Fetch images for this article's title
-            image_urls = fetch_image_urls(title, GOOGLE_API_KEY, GOOGLE_CX, NUM_IMAGES_PER_ARTICLE)
-            if not image_urls:
-                print("❌ No images found, skipping video.")
-                continue
-
-            # Make TikTok-style video
-            video_path = make_video(article, image_urls, OUTPUT_DIR)
-            print(f"✅ Video created: {video_path}")
-
+            
+            # Fetch image URLs based on article title
+            image_urls = fetch_image_urls(article["title"], API_KEY, CX, num_images=10)
+            
+            # Make video with the article info and images
+            video_path = make_video(article, image_urls, narration_text=script_text)
+            
+            if video_path:
+                print(f"✅ Video created: {video_path}")
+            else:
+                print(f"⚠️ Skipped video for article: {article['title']}")
         except Exception as e:
-            print(f"❌ Error processing '{title}': {e}")
+            print(f"❌ Error processing '{article['title']}': {e}")
 
 if __name__ == "__main__":
     main()

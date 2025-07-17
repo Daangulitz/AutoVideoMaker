@@ -1,77 +1,85 @@
-import cv2
-import numpy as np
 import os
-from gtts import gTTS
-from PIL import Image
 import requests
 from io import BytesIO
-from pathlib import Path
+from PIL import Image
+from gtts import gTTS
+import ffmpeg
 
-def download_images(image_urls, save_dir):
-    os.makedirs(save_dir, exist_ok=True)
+def download_images(image_urls, folder="images"):
+    os.makedirs(folder, exist_ok=True)
     paths = []
     for i, url in enumerate(image_urls):
         try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-            img = Image.open(BytesIO(response.content)).convert("RGB")
-            file_path = os.path.join(save_dir, f"image_{i}.jpg")
-            img.save(file_path)
-            paths.append(file_path)
+            r = requests.get(url, timeout=10)
+            r.raise_for_status()
+            img = Image.open(BytesIO(r.content)).convert("RGB")
+            path = os.path.join(folder, f"img_{i:03d}.jpg")
+            img.save(path)
+            paths.append(path)
         except Exception as e:
-            print(f"❌ Error downloading image {i}: {e}")
+            print(f"Failed to download image {url}: {e}")
     return paths
 
-def generate_narration(text, output_path):
+def generate_audio(text, filename="audio.mp3"):
     tts = gTTS(text)
-    tts.save(output_path)
+    tts.save(filename)
+    return filename
 
-def create_video(image_paths, audio_path, output_path, duration_per_image=6):
-    if not image_paths:
-        print("❌ No images to create video.")
-        return
+def create_video_from_images(image_files, output_file, image_duration=5, fps=24):
+    # Create a text file listing images for ffmpeg concat demuxer
+    list_file = "images.txt"
+    with open(list_file, "w") as f:
+        for img_path in image_files:
+            f.write(f"file '{os.path.abspath(img_path)}'\n")
+            f.write(f"duration {image_duration}\n")
+        # To ensure last image duration is used (ffmpeg quirk)
+        f.write(f"file '{os.path.abspath(image_files[-1])}'\n")
 
-    frame_width = 1280
-    frame_height = 720
-    fps = 1  # 1 frame per second
+    # Build video from images using ffmpeg concat demuxer
+    # Note: Must use -safe 0 for absolute paths
+    ffmpeg_cmd = (
+        ffmpeg
+        .input(list_file, format='concat', safe=0)
+        .output(output_file, vcodec='libx264', pix_fmt='yuv420p', r=fps)
+        .overwrite_output()
+    )
+    ffmpeg_cmd.run()
+    os.remove(list_file)
+    return output_file
 
-    # VideoWriter
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video_writer = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+def combine_audio_video(video_file, audio_file, output_file):
+    input_video = ffmpeg.input(video_file)
+    input_audio = ffmpeg.input(audio_file)
+    ffmpeg.output(input_video.video, input_audio.audio, output_file, vcodec='copy', acodec='aac', strict='experimental').overwrite_output().run()
+    return output_file
 
-    for image_path in image_paths:
-        img = Image.open(image_path)
-        img = img.resize((frame_width, frame_height))
-        frame = np.array(img)
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+if __name__ == "__main__":
+    article_title = "Amazing Nature Photos"
+    article_description = "A collection of breathtaking views from around the world."
+    text = f"{article_title}. {article_description}"
 
-        for _ in range(duration_per_image):
-            video_writer.write(frame)
+    images = [
+        "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=800&q=80",
+    ]
 
-    video_writer.release()
+    print("Downloading images...")
+    image_files = download_images(images)
 
-    # Add audio using ffmpeg-python fallback
-    try:
-        import ffmpeg
-        temp = output_path.replace(".mp4", "_with_audio.mp4")
-        ffmpeg.input(output_path).output(audio_path, temp, vcodec='copy', acodec='aac', strict='experimental').run(overwrite_output=True)
-        os.replace(temp, output_path)
-    except Exception as e:
-        print("⚠️ Could not add audio:", e)
+    print("Generating audio...")
+    audio_file = generate_audio(text)
 
-def make_video(article, image_urls, output_dir="outputs"):
-    title = article.get("title", "No Title")
-    description = article.get("description", "No Description")
-    text = f"{title}. {description}"
+    temp_video = "temp_video.mp4"
+    output_video = "final_video_with_audio.mp4"
 
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    basename = title[:30].replace(" ", "_").replace("/", "")  # Safe filename
-    audio_path = os.path.join(output_dir, f"{basename}_audio.mp3")
-    video_path = os.path.join(output_dir, f"{basename}.mp4")
-    image_dir = os.path.join(output_dir, basename)
+    print("Creating video from images...")
+    create_video_from_images(image_files, temp_video, image_duration=5)
 
-    generate_narration(text, audio_path)
-    image_paths = download_images(image_urls, image_dir)
-    create_video(image_paths, audio_path, video_path)
+    print("Combining video and audio...")
+    combine_audio_video(temp_video, audio_file, output_video)
 
-    return video_path
+    print(f"Video created: {output_video}")
+
+    # Cleanup temp video if you want
+    os.remove(temp_video)
