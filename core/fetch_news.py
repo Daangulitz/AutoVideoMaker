@@ -3,13 +3,12 @@ import requests
 def fetch_news(page_size=3):
     api_key = "70fd13c91ea049449019a2dbd5a85d56"
 
-    url = "https://newsapi.org/v2/everything"
+    url = "https://newsapi.org/v2/top-headlines"
     params = {
         "apiKey": api_key,
-        "q": "breaking OR world OR international", 
         "language": "en",
-        "sortBy": "publishedAt",
-        "pageSize": page_size
+        "pageSize": page_size,
+        "category": "general",  # You can also try 'world' or 'business' etc.
     }
 
     try:

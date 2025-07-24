@@ -1,34 +1,49 @@
+from core.make_card import make_image_card
 from core.fetch_news import fetch_news
-from core.generate_script import generate_script
 from core.image_fetcher import fetch_image_urls
-from core.make_video import make_video
+import os
 
-# Your API config here
-API_KEY = 'YOUR_API_KEY'
-CX = 'YOUR_CX_CODE'
+PROCESSED_FILE = "processed.txt"
+
+def load_processed():
+    if not os.path.exists(PROCESSED_FILE):
+        return set()
+    with open(PROCESSED_FILE, "r", encoding="utf-8") as f:
+        return set(line.strip() for line in f.readlines())
+
+def save_processed(title):
+    with open(PROCESSED_FILE, "a", encoding="utf-8") as f:
+        f.write(title + "\n")
 
 def main():
-    articles = fetch_news(page_size=3)
+    API_KEY = "AIzaSyChJ3ygRo98LslFDxm7OopoBqqlPfx9y_g"
+    CX = "f54d4c38836df40ac"
+    
+    processed_titles = load_processed()
+    articles = fetch_news(page_size=100)  
 
     for article in articles:
+        title = article["title"].strip()
+        if title in processed_titles:
+            print(f"⏭ Skipping already processed article: {title}")
+            continue
+
         try:
-            print(f"[+] Processing article: {article['title']}")
-            
-            # Generate narration script/text for video
-            script_text = generate_script(article)
-            
-            # Fetch image URLs based on article title
-            image_urls = fetch_image_urls(article["title"], API_KEY, CX, num_images=10)
-            
-            # Make video with the article info and images
-            video_path = make_video(article, image_urls, narration_text=script_text)
-            
-            if video_path:
-                print(f"✅ Video created: {video_path}")
-            else:
-                print(f"⚠️ Skipped video for article: {article['title']}")
+            print(f"[+] Processing article: {title}")
+
+            image_urls = fetch_image_urls(title, API_KEY, CX, num_images=1)
+            if not image_urls:
+                print("❌ No image found.")
+                continue
+
+            image_url = image_urls[0]
+            make_image_card(image_url, title, output_path=f"output_{len(processed_titles)+1}.jpg")
+
+            save_processed(title)
+            break
+
         except Exception as e:
-            print(f"❌ Error processing '{article['title']}': {e}")
+            print(f"❌ Error creating image card: {e}")
 
 if __name__ == "__main__":
     main()
